@@ -40,4 +40,5 @@ def load(dataLabel,param=3):
         else:
             vars = labels[i] + 's'
         exec(f'datalist.append({vars})')
+    os.remove('output.csv')
     return datalist

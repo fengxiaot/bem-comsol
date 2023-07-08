@@ -1,11 +1,13 @@
 import mph
 import os
 from globalvar import *
+from shutil import rmtree
 
 client = mph.start()
 model = client.load(mph_file_path) # The path of mph file
-if not os.path.exists('data'):
-    os.makedirs('data')
+if os.path.exists('data'):
+    rmtree('data')
+os.makedirs('data')
 paramdict = model.parameters()
 
 for param in paramdict:
