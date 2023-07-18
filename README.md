@@ -123,7 +123,7 @@ This is the tree of the work dictionary:
 ```bash
 bem-comsol
 │
-│  ctrl_voltage.py
+│  simulate.py
 │  freqsol.py
 │  globalvar.py
 │  load.py
