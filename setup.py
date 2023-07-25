@@ -11,7 +11,7 @@ setup(
     install_requires=[
         'numpy',
         'scipy',
-        'mph'
+        'mph',
         'pandas'
     ],
 )
