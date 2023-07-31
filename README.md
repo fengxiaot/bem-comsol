@@ -2,7 +2,7 @@
 
 bem-comsol is a python package that can simulate electrostatics for ion traps using boundary element method provided by COMSOL Multiphysics. It also provides a tool to analyze 1D electric potential and find the eigenmodes.
 
-![structure](img/structure.png)
+![structure](docs./img/structure.png)
 
 The diagram above shows how the program works. The program requires you to create the basic modeling workflow in COMSOL and save it as an `mph` file. Then, execute the Python code, and the program will automatically use the **control voltage method** to sequentially set electrode voltages and export spatial potential data as CSV file. 
 
@@ -12,10 +12,17 @@ Then, you can run the mode solver to analyze and solve the one-dimensional axial
 
 ## Installation
 
-Clone the directory
+Use pip to install bemcomsol
 
 ```bash
-git clone https://github.com/fengxiaot/bem-comsol.git
+pip install git+https://github.com/fengxiaot/bem-comsol.git
+```
+
+import the package
+
+```python
+from bemcomsol.simulation import simulate,load
+from bemcomsol.mode1d import eqposition,eqposition_analytic,eqposition_sym,mode1d,mode1d_analytic
 ```
 
 <br/>
@@ -53,7 +60,7 @@ This is the most important step. Under `Global Definitions -> Parameters` , crea
 - *Expression* can be any value. Python code will sequentially set them to `1[V]` .
 - The number of parameters should be the same as the number of electrodes you want to apply control voltage method. You don't need to create a parameter for grounding electrodes or those having a constant voltage.
 
-![Parameters](img/parameters.png)
+![Parameters](docs/img/parameters.png)
 
 ### Create Boundary Selections
 
@@ -64,7 +71,7 @@ This step is not a must but will bring a lot of benefits.
 3. In `Output Entities` , select `Adjacent boundaries` 
 4. Repeat the steps for each electrodes
 
-![Selections](img/selections.png)
+![Selections](docs/img/selections.png)
 
 ### Set Boundary Conditions
 
@@ -74,7 +81,7 @@ Now let us define the problem.
 2. In the menu bar, click `Physics -> Boundaries -> Electric Potential` 
 3. Under *Boundary Selection*, choose the selection of exterior boundaries of one of the electrodes you have just defined in the [previous subsection](#Create Boundary Selections). Under *Electric Potential*, set $V_0 = \mathrm{DC}i$, the name of parameters you defined just now.
 
-![esbe](img/esbe.png)
+![esbe](docs/img/esbe.png)
 
 4. Repeat the steps for each electrodes
 
@@ -117,65 +124,3 @@ Now export data and check if it functions properly! If so, save the workflow as 
 <br/>
 
 ## Python
-
-This is the tree of the work dictionary:
-
-```bash
-bem-comsol
-│
-│  simulate.py
-│  freqsol.py
-│  globalvar.py
-│  load.py
-│  output.csv
-│  README.md
-│
-└─model
-        SimpleTrap.mph
-        SimpleTrap.stl
-```
-
-### globalvar.py
-
-This file define the global variables and the path of your `mph` file. You should change **mph_file_path** first!
-
-### ctrl_voltage.py
-
-This is the second program to run. 
-
-- It will create a folder named `data` . 
-- It will automatically use the **control voltage method** to sequentially set electrode voltages, solve the model, and export the data in CSV format based on the configuration in the `mph` file. The CSV files records the spatial distribution of the electric field when the voltage of each electrode is set to `1[V]` and others are set to `0[V]` .
-
-<br/>
-
-## Mode Solver
-
-Mode solver is a tool to analyze the one-dimensional axial potential and solve for the eigenmodes.
-
-### load.py
-
-`load.py` defines a function `load()` to read the CSV files in `/data` .
-
-```python
-load(dataLabel, param = 3)
-```
-
-Input:
-   - <u>dataLabel</u>: Labels of data. The elements of dataLabel should match the number of columns, and separated by comma. It should begin with coordinate variables, and then physics quantity. 
-
-        <span style="color:DarkKhaki;"> /* Example: `x,y,z,esbeV,esbeE` or `x,y,Ex,Ey`. */ </span>
-
-   - <u>param</u>: Number of coordinate variables. Default value is 3.
-
-        <span style="color:DarkKhaki;"> /* Example: param of `x,y,Ex,Ey` should be set to 2. */ </span>
-
-Output: A list of object
-
-- For each coordinate variable, it creates a numpy array recording the data points
-- For each physics quantity, it creates a *dict* named with 'label' + 's', whose keys are 'DCi'.
-
-> Example: If the data outputted by COMSOL contains five columns, the first three columns represent spatial coordinates, and the last two columns respectively record the potential and electric field, after loading it with `load('x,y,z,V,E', param=2)` , we will get 3 numpy arrays `x` , `y` and `z` recording the coordinates, and 2 dicts, `Vs` and `Es` . We can use `Vs['DC3']` to access the electric potential when DC3 is set to `1[V]` and others set to `0[V]`.
-
-###  freqsol.py
-
-`freqsol.py` defines a series of function that interpolate the potential data and solve for eigenmodes.
