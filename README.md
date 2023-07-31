@@ -2,7 +2,7 @@
 
 bem-comsol is a python package that can simulate electrostatics for ion traps using boundary element method provided by COMSOL Multiphysics. It also provides a tool to analyze 1D electric potential and find the eigenmodes.
 
-![structure](docs./img/structure.png)
+![structure](docs/img/structure.png)
 
 The diagram above shows how the program works. The program requires you to create the basic modeling workflow in COMSOL and save it as an `mph` file. Then, execute the Python code, and the program will automatically use the **control voltage method** to sequentially set electrode voltages and export spatial potential data as CSV file. 
 
