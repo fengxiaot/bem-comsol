@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='bemcomsol',
-    version='0.1.0',
+    version='0.1.1',
     description='A python package that can simulate electrostatics for ion traps using boundary element method provided by COMSOL Multiphysics.',
     author='Xiaotian Feng',
     author_email='fxt2003@outlook.com',

@@ -2,18 +2,20 @@ import numpy as np
 from scipy.optimize import root_scalar,root
 from scipy.interpolate import UnivariateSpline
 import scipy.constants as const
-import re
 
 e = const.e
 pi = const.pi
 epsilon0 = const.epsilon_0
 mCa = 40.078 * const.u
+m_e = const.m_e
 
 def unit_to_num(unit):
     '''
     unit_to_num() transfers string that indicates unit to order of magnitude.
     '''
-    if unit == '[mm]' or unit == 'mm':
+    if unit == '[m]' or unit == 'm':
+        return 1
+    elif unit == '[mm]' or unit == 'mm':
         return 1e-3
     elif unit == '[um]' or unit == 'um':
         return 1e-6
@@ -22,27 +24,34 @@ def unit_to_num(unit):
     else:
         raise TypeError('No type matching!')
 
-def eqposition_sym(z:np.ndarray, esbeV:np.ndarray, unit='[um]', k=5, smooth=1e-6, pos0=1e-3, step=0.02):
+def eqposition_sym(z:np.ndarray, esbeV:np.ndarray, unit='[um]', k=5, s=1e-6, pos0=1e-3, step=0.02):
     '''
-    eqposition_sym() will find the equilibrium postion and eigenmodes based on the assumption that the electric potential function is symmetric.
+    eqposition_sym() will find the equilibrium postion and eigenmodes
+    based on the assumption that the electric potential function is symmetric.
     
-    Input
-    --------
-    z: np.ndarray
+    NOTE: eqposition_sym() only support 2 ions.
+
+    Parameters
+    ----------
+    z : np.ndarray
         Coordinate.
-    - esbeV: Electric potential.
-    - unit: Unit of z. Default value is '[um]'.
-    - k: Degree of the smoothing spline. Must be `1 <= k <= 5`.
-    - s: Smoothing factor of spline.
-    - pos0: The starting point for the root search (in the unit of rescaled coordinate).
-    - step: The step length for the root search (in the unit of rescaled coordinate).
+    esbeV : np.ndarray
+        Corresponding electric potential V(z).
+    unit : str
+        Unit of z. Default value is '[um]'.
+    k : int
+        Degree of the smoothing spline. Must be `1 <= k <= 5`.
+    s : float
+        Smoothing factor of spline.
+    pos0 : float
+        The starting point for the root search (in the unit of rescaled coordinate).
+    step : float
+        The step length for the root search (in the unit of rescaled coordinate).
 
-    Output
-    --------
-    - z:
-
-    It will iterate through positive $z$ coordinates, and compute the derivative of potential function $V$ at $[-z,z]$ until it finds root.
-    eqposition_sym() only supports 2 ions. 
+    Returns
+    -------
+    z0 : np.ndarray
+        Equilibrium positions.
     '''
 
     # Rescale the coordinate to [-1,1]
@@ -51,7 +60,7 @@ def eqposition_sym(z:np.ndarray, esbeV:np.ndarray, unit='[um]', k=5, smooth=1e-6
     r0 = zlim * unit_to_num(unit)
 
     # Interpolation
-    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=smooth) # spl.get_residual() <= s
+    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=s) # spl.get_residual() <= s
     dVspl = Vspl.derivative(1)
 
     # Define the function to be solved
@@ -74,20 +83,33 @@ def eqposition_sym(z:np.ndarray, esbeV:np.ndarray, unit='[um]', k=5, smooth=1e-6
     z0 = zeta0 * zlim
     return z0
 
-def eqposition(z:np.ndarray, esbeV:np.ndarray, inipos, N=2, unit='[um]', k=5, smooth=1e-6, method='hybr'):
+def eqposition(z:np.ndarray, esbeV:np.ndarray, inipos:np.ndarray, N=2, unit='[um]', k=5, s=1e-6, method='hybr'):
     '''
-    eqposition will find the equilibrium position of ions.
+    Find the equilibrium position of ions.
 
-    Input:
-    - z: Coordinate. The unit of inipos should be the parameter `unit`.
-    - esbeV: Electric potential.
-    - inipos: Initial guess for ion positions that will be passed into `scipy.optimize.root`. The unit of inipos should be the parameter `unit`.
-    - N: ion number. Default is 2 ions.
-    - unit: Unit of z.
-    - k: Degree of the smoothing spline. Must be 1 <= k <= 5.
-    - s: Smoothing factor.
-    - m: Mass of ion. Default value is Ca+.
-    - method: methods provided by scipy.optimize.root
+    Parameters
+    ----------
+    z : np.ndarray
+        Coordinate.
+    esbeV : np.ndarray
+        Corresponding electric potential V(z).
+    inipos : np.ndarray
+        Initial guess of equilibrium position of ions.
+    N : int
+        Number of ions. Default value is 2.
+    unit : str
+        Unit of z. Default value is '[um]'.
+    k : int
+        Degree of the smoothing spline. Must be `1 <= k <= 5`.
+    s : float
+        Smoothing factor of spline.
+    method : str
+        Type of solver provided by `scipy.optimize.root`
+
+    Returns
+    -------
+    z0 : np.ndarray
+        Equilibrium positions.
     '''
 
     # Rescale the coordinate to [-1,1]
@@ -97,7 +119,7 @@ def eqposition(z:np.ndarray, esbeV:np.ndarray, inipos, N=2, unit='[um]', k=5, sm
     r0 = zlim * unit_to_num(unit)
 
     # Interpolation
-    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=smooth) # spl.get_residual() <= s
+    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=s) # spl.get_residual() <= s
     dVspl = Vspl.derivative(1)
     ddVspl = Vspl.derivative(2)
 
@@ -121,15 +143,37 @@ def eqposition(z:np.ndarray, esbeV:np.ndarray, inipos, N=2, unit='[um]', k=5, sm
     z0 = zeta0 * zlim
     return z0
 
-def mode1d(z:np.ndarray, esbeV:np.ndarray, z0:np.ndarray, N=2, unit='[um]', k=5, smooth=1e-6, m=mCa):
+def mode1d(z:np.ndarray, esbeV:np.ndarray, z0:np.ndarray, N=2, unit='[um]', k=5, s=1e-6, m=mCa):
     '''
-    mode1d() will solve for frequency f, NOT angular frequency.
+    Solve for trap frequencies.
 
-    Input:
-    - z: Coordinate.
-    - esbeV: Electric potential.
-    - z0: Equilibrium postion of ions.
-    - N: Number of ions. Default value is 2.
+    NOTE: The result is not angular frequency but ordinary frequency.
+
+    Parameters
+    ----------
+    z : np.ndarray
+        Coordinate.
+    esbeV : np.ndarray
+        Corresponding electric potential V(z).
+    z0 : np.ndarray
+        Equilibrium position of ions.
+    N : int
+        Number of ions. Default value is 2.
+    unit : str
+        Unit of z. Default value is '[um]'.
+    k : int
+        Degree of the smoothing spline. Must be `1 <= k <= 5`.
+    s : float
+        Smoothing factor of spline.
+    m : float
+        Mass of ions.
+    method : str
+        Type of solver provided by `scipy.optimize.root`
+      
+    Returns
+    -------
+    w : np.ndarray
+        Eigenmodes.
     '''
 
     # Rescale the coordinate to [-1,1]
@@ -139,7 +183,7 @@ def mode1d(z:np.ndarray, esbeV:np.ndarray, z0:np.ndarray, N=2, unit='[um]', k=5,
     r0 = zlim * unit_to_num(unit)
 
     # Interpolation
-    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=smooth) # spl.get_residual() <= s
+    Vspl = UnivariateSpline(zeta,esbeV,k=k,s=s) # spl.get_residual() <= s
     ddVspl = Vspl.derivative(2)
 
     # Solve for the eigenmodes
@@ -160,18 +204,29 @@ def mode1d(z:np.ndarray, esbeV:np.ndarray, z0:np.ndarray, N=2, unit='[um]', k=5,
 
 def eqposition_analytic(Vfunc, dVfunc, ddVfunc, inipos, N=2, unit='[um]', method='hybr'):
     '''
-    eqposition_analytic will find the equilibrium position of ions.
+    Find the equilibrium position of ions.
 
-    Input:
-    - z: Coordinate.
-    - esbeV: Electric potential.
-    - inipos: Initial guess for ion positions that will be passed into `scipy.optimize.root`
-    - N: ion number. Default is 2 ions.
-    - unit: Unit of z and inipos. Default is micrometer.
-    - k: Degree of the smoothing spline. Must be 1 <= k <= 5.
-    - s: Smoothing factor.
-    - m: Mass of ion. Default value is Ca+.
-    - method: methods provided by scipy.optimize.root
+    Parameters
+    ----------
+    Vfunc : function
+        Electric potential function.
+    dVfunc : function
+        First order derivative of electric potential function.
+    ddVfunc : function
+        Second order derivative of electric potential function.
+    inipos : np.ndarray
+        Initial guess of equilibrium position of ions.
+    N : int
+        Number of ions. Default value is 2.
+    unit : str
+        Unit of z. Default value is '[um]'.
+    method : str
+        Type of solver provided by `scipy.optimize.root`
+
+    Returns
+    -------
+    z0 : np.ndarray
+        Equilibrium positions.
     '''
 
     # Rescale the coordinate to [-1,1]
@@ -198,13 +253,28 @@ def eqposition_analytic(Vfunc, dVfunc, ddVfunc, inipos, N=2, unit='[um]', method
 
 def mode1d_analytic(ddVfunc, z0, N=2, unit='[um]', method='hybr', m=mCa):
     '''
-    mode1d() will solve for frequency f, NOT angular frequency.
+    Solve for trap frequencies.
 
-    Input:
-    - z: Coordinate.
-    - esbeV: Electric potential.
-    - z0: Equilibrium postion of ions.
-    - N: Number of ions. Default value is 2.
+    NOTE: The result is not angular frequency but ordinary frequency.
+
+    Parameters
+    ----------
+    ddVfunc : function
+        Second order derivative of the electrostatic potential function.
+    z0 : np.ndarray
+        Equilibrium position of ions.
+    N : int
+        Number of ions. Default value is 2.
+    unit : str
+        Unit of z. Default value is '[um]'.
+
+    m : float
+        Mass of ions.
+    
+    Returns
+    -------
+    w : np.ndarray
+        Eigenmodes.
     '''
 
     # Rescale the coordinate to [-1,1]

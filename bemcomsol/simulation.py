@@ -7,6 +7,11 @@ import pandas as pd
 import re
 
 class Parameter:
+    '''
+    COMSOL Parameter with attributes `name` `expr` and `unit`.
+
+    `unit` attribute default set to be none.
+    '''
     def __init__(self, name, expression, unit=''):
         self.name = name
         self.expr = expression
@@ -19,11 +24,35 @@ def remove_illegal_chars(filename):
 
 def simulate(mphpath, datapath, *parameters):
     '''
-    Input:
-    - mphpath: path of COMSOL mph file.
-    - datapath: path where data is exported. Warning: ALL files in that path will be cleared.
-    - parameters(optional): Param objects. If they are numbers or strings, the program will directly change it when do simulations.
-    If they are lists or strings, the program will iterate based on it.
+    Use COMSOL for simulation and export the results to the specified folder.
+
+    Parameters
+    ----------
+    mphpath : str
+        The path to the COMSOL mph file.
+    datapath : str
+        The folder for exporting data files. Warning: Overwrite mode enabled.
+    *parameters : Parameter objects, optional
+        Other parameters that need to be manipulated (other than DC voltages).
+        For each Parameter object, 
+        - if its `expr` attribute is a number or string,
+            the program will directly change it when performing simulations.
+        - if its `expr` attribute is a list of numbers, list of strings or a numpy array,
+            the program will iterate based on it.
+        - if there is more than one Parameter object with `expr` attributes as a list or ndarray,
+            the program will calculate their Cartesian product and iterate and simulate them sequentially.
+    
+    Returns
+    -------
+    CSV data files. Named after the electrodes, representing the data when
+    this electrode is set to 1[V] while the other electrodes are set to 0[V].
+
+    Examples
+    --------
+    The following code shows how to simulate a blade trap with different lengths (L) and blade widths (d).
+
+    >>> from bemcomsol.simulation import simulate
+    >>> simulate('model/blade.mph','data',Parameter('L',[100,200,400],'[um]'),Parameter('d',['0.8*L','0.9*L']))
     '''
 
     client = mph.start()
@@ -88,20 +117,59 @@ def simulate(mphpath, datapath, *parameters):
 
 def load(path, datalabel, coordinates=3):
     '''
-        Input
-        - *path*: Directory path where you want to import CSV file from.
-        - *datalabel*: Data labels of CSV file. The elements of dataLabel should match the number of columns, and seperated by comma ','. It should begin with coordinate variables, and then physics quantity. Example: 'x,y,z,esbeV' or 'x,y,Ex,Ey'.
-        - *coordinates*: Number of coordinate variables. For example, 'x,y,Ex,Ey' should be set as 2. Default value is 3.
+        Read the data files obtained from the COMSOL simulation and convert them into numpy arrays.
 
-        Output: A list of object
-        - For each coordinate variable, it creates a numpy array recording the coordinate data.
-        - For each physics quantity, it creates a dict named with 'label' + 's', whose keys are 'DCi'.
+        Parameters
+        ----------
+        path : str
+            Directory path from which the program import CSV file.
+        datalabel : str
+            Column labels of the data, seperate by comma `','`.
+            It should begin with coordinate variables, and then physics quantities.
+        coordinates : int
+            Number of coordinate variables. Default value is 3.
 
-        Example:
-        If the data outputted by COMSOL contains five columns, the first three columns represent spatial coordinates,
-        and the last two columns respectively record the potential and electric field, after loading it with 
-        `load(path, 'x,y,z,V,E', coordinates=3)` , we will get 3 numpy arrays `x` , `y` and `z` recording the coordinates,
-        and 2 dicts, `Vs` and `Es` . We can use `Vs['DC3']` to access the electric potential when DC3 is set to 1[V] and others set to 0[V].
+        Returns
+        -------
+        For each coordinate variable, it creates a numpy array to record the coordinate values,
+        and the array is named as specified in `datalabel`.
+
+        For each physical quantity, it creates a dictionary named as the specified name in `datalabel`
+        followed by a suffix 's'. The keys of the dictionary are electrode names like `'DCi'`.
+        The corresponding values are the values of the physical quantity when this electrode
+        is set to 1[V] while the other electrodes are set to 0[V].
+
+        Examples
+        --------
+        Assuming that after the simulation, we obtained two CSV files in the "data" folder,
+        namely `DC1.csv` and `DC2.csv`. These files record the potential and the y-direction
+        electric field when two DC electrodes are set to 1[V], with x=0, y coordinates at -1, 0, and 1.
+
+        >>> # DC1.csv                 # DC2.csv
+        ... +----+----+----+----+    +----+----+----+----+
+        ... |x   |y   |V   |Ey  |    |x   |y   |V   |Ey  |
+        ... +====+====+====+====+    +====+====+====+====+
+        ... |0   |-1  |0   |-1  |    |0   |-1  |1   |1   |
+        ... +----+----+----+----+    +----+----+----+----+
+        ... |0   |-1  |1   |0   |    |0   |-1  |0   |0   |
+        ... +----+----+----+----+    +----+----+----+----+
+        ... |0   |-1  |0   |1   |    |0   |-1  |0   |0   |
+        ... +----+----+----+----+    +----+----+----+----+
+
+        We could use the following code to load them
+
+        >>> from bemcomsol.simulation import load
+        >>> [x,y,Vs,Eys] = load('data','x,y,V,Ey',coordinates=2)
+
+        NOTE: The `datalabel` does not necessarily have to be the same as the variable names used in COMSOL;
+        you are free to specify it as you wish.
+
+        To access the data, use
+
+        >>> print(x)
+        >>> # x = [0,0,0]
+        >>> print(Vs['DC2'])
+        >>> # Eys['DC2'] = [1,0,0]
     '''
     cwd = os.path.join(os.getcwd(), path)
     files = os.listdir(cwd)
@@ -113,7 +181,7 @@ def load(path, datalabel, coordinates=3):
     for file in files:
         with open(os.path.join(cwd,file), 'r') as COMSOL: 
             lines = COMSOL.readlines()
-        newlines = [row for row in lines if row[0]!='%'] # Delete annotation
+        newlines = [row for row in lines if row[0]!='%'] # Delete annotation generate by COMSOL
         with open('output.csv', 'w') as csvdata:
             csvdata.write(datalabel+'\n')
             csvdata.writelines(newlines)

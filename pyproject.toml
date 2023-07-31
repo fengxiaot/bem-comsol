@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "bemcomsol"
-version = "0.1.0"
+version = "0.1.1"
 description = "A python package that can simulate electrostatics for ion traps using boundary element method provided by COMSOL Multiphysics."
 authors = ["Xiaotian Feng <fxt2003@outlook.com>"]
 repository = "https://github.com/fengxiaot/bem-comsol"
